@@ -1,0 +1,81 @@
+services:
+  app:
+    container_name: app
+    restart: always
+    command: npm run dev
+    profiles:
+      - all
+    build:
+      context: .
+    volumes:
+      - ./:/usr/src/app
+    depends_on:
+      - mongo
+      - postgres
+    networks:
+      - paramlabs
+    ports:
+      - ${PORT:-3000}:3000
+      - 9245:9245
+    env_file:
+      - .env/.common.env
+      - .env/.docker.env
+
+  mongo:
+    container_name: mongo
+    profiles:
+      - all
+      - db
+    image: mongo
+    volumes:
+      - ./db/mongo:/data/db
+    networks:
+      - paramlabs
+    restart: always
+    ports:
+      - 27017:27017
+
+  postgres:
+    container_name: postgres
+    profiles:
+      - all
+      - db
+    image: postgres
+    volumes:
+      - ./db/postgres:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d/
+    networks:
+      - paramlabs
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+
+  pgadmin:
+    container_name: pgadmin
+    profiles:
+      - all
+      - db
+    image: dpage/pgadmin4
+    command: chown -R pgadmin:pgadmin /var/lib/pgadmin
+    volumes:
+      - ./db/pgadmin:/var/lib/pgadmin
+    networks:
+      - paramlabs
+    restart: always
+    depends_on:
+      - postgres
+    ports:
+      - ${PGADMIN_PORT:-80}:80
+    environment:
+      PGADMIN_DEFAULT_EMAIL: user@kiraverse.game
+      PGADMIN_DEFAULT_PASSWORD: kiraverse
+    env_file:
+      - .env/.common.env
+      - .env/.docker.env
+
+networks:
+  paramlabs:
+    driver: bridge

@@ -1,0 +1,71 @@
+name: Node CI
+
+on: [push,pull_request]
+
+jobs:
+  Test:
+
+    runs-on: ubuntu-latest
+
+    container:
+      image:  node:16
+
+    services:
+      mongodb:
+        image: mongo
+        ports:
+        - 27017:27017
+        options: >-
+          --health-cmd "echo 'db.runCommand("ping").ok' | mongosh --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --name mongo_container
+
+      postgres:
+        image: postgres
+        ports:
+        - 5432:5432
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          PGUSER: postgres
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Run linter
+      run: |
+        npm ci
+        npm run lint
+      env:
+        CI: true
+        NODE_ENV: test
+    - name: Run tests
+      run: |
+        npm run generate:certs
+        npm test
+      env:
+        CI: true
+        NODE_ENV: test
+        IS_INIT_DB: false
+        SENDGRID_API_KEY: SG.fakeKey
+        POSTGRES_DB: postgres
+        POSTGRES_HOST: postgres
+        MONGODB_URL: mongodb://mongodb:27017/app-test
+        RECAPTCHA_ENABLED: false
+    - name: Generate API Doc
+      run: |
+        npm run generate:swagger
+        npm run generate:postman
+      env:
+        SWAGGER_SERVERS: http://localhost:3000,https://api.kiraverse.game,https://kira.gamestoplauncher.io
+    - uses: actions/upload-artifact@v3
+      with:
+        name: api-docs
+        path: docs/api.*.json
